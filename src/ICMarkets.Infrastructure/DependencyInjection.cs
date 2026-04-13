@@ -20,7 +20,11 @@ public static class DependencyInjection
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(
                 configuration.GetConnectionString("DefaultConnection"),
-                npgsql => npgsql.EnableRetryOnFailure(3)));
+                npgsql =>
+                {
+                    npgsql.EnableRetryOnFailure(3);
+                    npgsql.CommandTimeout(15);
+                }));
 
         services.AddScoped<IBlockchainDataRepository, BlockchainDataRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -32,7 +36,11 @@ public static class DependencyInjection
                 client.Timeout = TimeSpan.FromSeconds(30);
             })
             .AddTransientHttpErrorPolicy(p =>
-                p.WaitAndRetryAsync(3, attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt))));
+                p.WaitAndRetryAsync(3, attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt))))
+            .AddTransientHttpErrorPolicy(p =>
+                p.CircuitBreakerAsync(
+                    handledEventsAllowedBeforeBreaking: 5,
+                    durationOfBreak: TimeSpan.FromSeconds(30)));
 
         services.AddHostedService<BlockchainDataCollector>();
 

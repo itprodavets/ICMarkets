@@ -8,7 +8,7 @@ namespace ICMarkets.Application.Blockchains.Commands;
 
 public record CollectBlockchainDataCommand : IRequest<int>;
 
-public class CollectBlockchainDataHandler
+public sealed class CollectBlockchainDataHandler
     : IRequestHandler<CollectBlockchainDataCommand, int>
 {
     private readonly IBlockCypherClient _client;

@@ -1,4 +1,4 @@
-using System.Net.Http.Json;
+using System.Text.Json;
 using ICMarkets.Application.Interfaces;
 using ICMarkets.Domain.Entities;
 using ICMarkets.Domain.ValueObjects;
@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace ICMarkets.Infrastructure.ExternalApis;
 
-public class BlockCypherClient : IBlockCypherClient
+public sealed class BlockCypherClient : IBlockCypherClient
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<BlockCypherClient> _logger;
@@ -22,8 +22,14 @@ public class BlockCypherClient : IBlockCypherClient
     {
         _logger.LogDebug("Requesting {Endpoint} from BlockCypher", endpoint);
 
-        var response = await _httpClient.GetFromJsonAsync<BlockCypherResponse>(
-            endpoint.ToApiPath(), ct);
+        // Stream directly from socket → JSON parser, no intermediate byte[] buffer
+        using var httpResponse = await _httpClient.GetAsync(
+            endpoint.ToApiPath(), HttpCompletionOption.ResponseHeadersRead, ct);
+        httpResponse.EnsureSuccessStatusCode();
+
+        await using var stream = await httpResponse.Content.ReadAsStreamAsync(ct);
+        var response = await JsonSerializer.DeserializeAsync(
+            stream, BlockCypherJsonContext.Default.BlockCypherResponse, ct);
 
         if (response is null)
             throw new InvalidOperationException($"Empty response from BlockCypher for {endpoint}");

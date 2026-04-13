@@ -14,7 +14,7 @@ public record GetBlockchainHistoryQuery(
     int Page = 1,
     int PageSize = 20) : IRequest<PagedResult<BlockchainDataDto>>;
 
-public class GetBlockchainHistoryQueryHandler
+public sealed class GetBlockchainHistoryQueryHandler
     : IRequestHandler<GetBlockchainHistoryQuery, PagedResult<BlockchainDataDto>>
 {
     private readonly IBlockchainDataRepository _repository;
@@ -41,7 +41,7 @@ public class GetBlockchainHistoryQueryHandler
     }
 }
 
-public class GetBlockchainHistoryQueryValidator : AbstractValidator<GetBlockchainHistoryQuery>
+public sealed class GetBlockchainHistoryQueryValidator : AbstractValidator<GetBlockchainHistoryQuery>
 {
     public GetBlockchainHistoryQueryValidator()
     {

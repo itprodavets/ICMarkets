@@ -3,7 +3,7 @@ using ICMarkets.Infrastructure.Data;
 
 namespace ICMarkets.Infrastructure;
 
-public class UnitOfWork : IUnitOfWork
+public sealed class UnitOfWork : IUnitOfWork
 {
     private readonly AppDbContext _context;
 

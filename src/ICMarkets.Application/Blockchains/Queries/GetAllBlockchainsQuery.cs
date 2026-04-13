@@ -7,7 +7,7 @@ namespace ICMarkets.Application.Blockchains.Queries;
 
 public record GetAllBlockchainsQuery : IRequest<IReadOnlyList<BlockchainDataDto>>;
 
-public class GetAllBlockchainsQueryHandler
+public sealed class GetAllBlockchainsQueryHandler
     : IRequestHandler<GetAllBlockchainsQuery, IReadOnlyList<BlockchainDataDto>>
 {
     private readonly IBlockchainDataRepository _repository;

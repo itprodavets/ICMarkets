@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace ICMarkets.Infrastructure.Data.Configurations;
 
-public class BlockchainDataConfiguration : IEntityTypeConfiguration<BlockchainData>
+public sealed class BlockchainDataConfiguration : IEntityTypeConfiguration<BlockchainData>
 {
     public void Configure(EntityTypeBuilder<BlockchainData> builder)
     {
