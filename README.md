@@ -72,6 +72,20 @@ dotnet test
 
 Tests use EF Core InMemory provider — no database required.
 
+### Run Benchmarks
+
+```bash
+dotnet run --project benchmarks/ICMarkets.Benchmarks -c Release -- --filter '*'
+```
+
+Run a specific benchmark suite:
+
+```bash
+dotnet run --project benchmarks/ICMarkets.Benchmarks -c Release -- --filter '*Json*'
+dotnet run --project benchmarks/ICMarkets.Benchmarks -c Release -- --filter '*Endpoint*'
+dotnet run --project benchmarks/ICMarkets.Benchmarks -c Release -- --filter '*Mapping*'
+```
+
 ## API Endpoints
 
 | Method | Route | Description | Rate Limit |
@@ -142,6 +156,45 @@ Response ← Brotli/GZip Compression ← Source-Gen JSON Serializer
 | Database | `EnableRetryOnFailure(3)`, 15s command timeout |
 | Connection pool | Npgsql multiplexing, 5–100 pool size |
 
+### Benchmark Results
+
+Measured on Apple M4 Max / .NET 10.0.2 with BenchmarkDotNet v0.14.0.
+
+**JSON Serialization (hot path)**
+
+| Method | Mean | Allocated |
+|--------|-----:|----------:|
+| Serialize DTO (reflection) | 371 ns | 832 B |
+| Serialize DTO (source-gen) | 438 ns | 832 B |
+| Deserialize DTO (reflection) | 620 ns | 280 B |
+| Deserialize DTO (source-gen) | 688 ns | 336 B |
+| Deserialize BlockCypher (reflection) | 704 ns | 1,248 B |
+| Deserialize BlockCypher (source-gen) | 690 ns | 1,248 B |
+
+On a warm JIT with .NET 10, reflection and source-gen paths are comparable in throughput. Source-gen gives its main advantage on cold start, AOT/trimming, and avoids reflection metadata caching on first use — critical for container restarts and scale-out.
+
+**Endpoint Lookup**
+
+| Method | Mean | Allocated |
+|--------|-----:|----------:|
+| FrozenSet.Contains (hit) | 9.3 ns | 0 B |
+| FrozenSet.Contains (miss) | 7.8 ns | 0 B |
+| List.Any (hit) | 1.8 ns | 0 B |
+| List.Any (miss) | 6.4 ns | 0 B |
+
+With only 5 endpoints, both are sub-10ns and zero-alloc. `FrozenSet` guarantees O(1) as the set grows, while `List.Any` would degrade linearly.
+
+**Object Mapping (Entity → DTO)**
+
+| Method | Mean | Allocated |
+|--------|-----:|----------:|
+| Mapster: single entity | 19 ns | 280 B |
+| Mapster: 100 entities | 1,765 ns | 28,856 B |
+| Manual: single entity | 16 ns | 280 B |
+| Manual: 100 entities | 1,794 ns | 28,856 B |
+
+Mapster matches hand-written mapping performance — zero overhead vs manual code. Both allocate identically (one DTO object per entity).
+
 ### What Happens Under Load
 
 1. **Read requests** hit the output cache (30s TTL). Cache miss triggers an `AsNoTracking` query that hits the composite index `(Network, Chain, CreatedAt DESC)`.
@@ -194,6 +247,8 @@ ICMarkets/
     ICMarkets.UnitTests/        (16 tests)
     ICMarkets.IntegrationTests/ (6 tests)
     ICMarkets.FunctionalTests/  (2 tests)
+  benchmarks/
+    ICMarkets.Benchmarks/       (BenchmarkDotNet)
   Dockerfile
   docker-compose.yml
 ```
