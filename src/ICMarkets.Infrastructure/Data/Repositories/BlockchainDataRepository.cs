@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ICMarkets.Infrastructure.Data.Repositories;
 
-public class BlockchainDataRepository : IBlockchainDataRepository
+public sealed class BlockchainDataRepository : IBlockchainDataRepository
 {
     private readonly AppDbContext _context;
 

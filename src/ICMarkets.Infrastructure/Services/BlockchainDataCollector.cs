@@ -8,7 +8,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace ICMarkets.Infrastructure.Services;
 
-public class BlockchainDataCollector : BackgroundService
+public sealed class BlockchainDataCollector : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<BlockchainDataCollector> _logger;

@@ -1,7 +1,10 @@
+using System.IO.Compression;
 using ICMarkets.Api.Middleware;
+using ICMarkets.Api.Serialization;
 using ICMarkets.Application;
 using ICMarkets.Infrastructure;
 using ICMarkets.Infrastructure.Data;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
@@ -24,12 +27,23 @@ builder.Services.AddOutputCache(options =>
          .Tag("blockchain"));
 });
 
-// Controllers + Swagger
+// Response compression — Brotli first, GZip fallback
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+});
+builder.Services.Configure<BrotliCompressionProviderOptions>(o =>
+    o.Level = CompressionLevel.Fastest);
+
+// Controllers + source-generated JSON serializer (zero-reflection)
 builder.Services.AddControllers()
     .AddJsonOptions(o =>
     {
         o.JsonSerializerOptions.DefaultIgnoreCondition =
             System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+        o.JsonSerializerOptions.TypeInfoResolverChain.Insert(0, ApiJsonContext.Default);
     });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -62,6 +76,7 @@ using (var scope = app.Services.CreateScope())
         await db.Database.EnsureCreatedAsync();
 }
 
+app.UseResponseCompression();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())

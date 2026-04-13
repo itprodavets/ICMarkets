@@ -1,3 +1,4 @@
+using ICMarkets.Api.Serialization;
 using ICMarkets.Application.Blockchains.Commands;
 using ICMarkets.Application.Blockchains.Queries;
 using ICMarkets.Application.Common;
@@ -11,7 +12,7 @@ namespace ICMarkets.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
-public class BlockchainsController : ControllerBase
+public sealed class BlockchainsController : ControllerBase
 {
     private readonly IMediator _mediator;
     private readonly IOutputCacheStore _cacheStore;
@@ -57,7 +58,7 @@ public class BlockchainsController : ControllerBase
     }
 
     [HttpPost("collect")]
-    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(CollectResult), StatusCodes.Status200OK)]
     public async Task<IActionResult> Collect(CancellationToken ct)
     {
         var count = await _mediator.Send(new CollectBlockchainDataCommand(), ct);
@@ -65,6 +66,6 @@ public class BlockchainsController : ControllerBase
         // invalidate cached responses so subsequent reads reflect fresh data
         await _cacheStore.EvictByTagAsync("blockchain", ct);
 
-        return Ok(new { CollectedCount = count });
+        return Ok(new CollectResult(count));
     }
 }

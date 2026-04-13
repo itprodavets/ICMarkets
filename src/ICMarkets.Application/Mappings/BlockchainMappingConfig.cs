@@ -4,7 +4,7 @@ using Mapster;
 
 namespace ICMarkets.Application.Mappings;
 
-public class BlockchainMappingConfig : IRegister
+public sealed class BlockchainMappingConfig : IRegister
 {
     public void Register(TypeAdapterConfig config)
     {
