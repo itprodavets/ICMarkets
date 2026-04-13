@@ -7,7 +7,7 @@ namespace ICMarkets.Application.Blockchains.Queries;
 
 public record GetBlockchainDataQuery(string Network, string Chain) : IRequest<BlockchainDataDto?>;
 
-public class GetBlockchainDataQueryHandler
+public sealed class GetBlockchainDataQueryHandler
     : IRequestHandler<GetBlockchainDataQuery, BlockchainDataDto?>
 {
     private readonly IBlockchainDataRepository _repository;

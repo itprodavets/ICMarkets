@@ -1,9 +1,9 @@
-using System.Text.Json;
 using FluentValidation;
+using ICMarkets.Api.Serialization;
 
 namespace ICMarkets.Api.Middleware;
 
-public class ExceptionHandlingMiddleware
+public sealed class ExceptionHandlingMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ILogger<ExceptionHandlingMiddleware> _logger;
@@ -24,25 +24,23 @@ public class ExceptionHandlingMiddleware
         {
             _logger.LogWarning("Validation failed: {Errors}", ex.Message);
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
-            context.Response.ContentType = "application/json";
 
-            var body = new
-            {
-                title = "Validation Failed",
-                status = 400,
-                errors = ex.Errors.Select(e => new { e.PropertyName, e.ErrorMessage })
-            };
+            var body = new ValidationErrorResponse(
+                "Validation Failed",
+                400,
+                ex.Errors.Select(e => new ValidationFieldError(e.PropertyName, e.ErrorMessage)));
 
-            await context.Response.WriteAsync(JsonSerializer.Serialize(body));
+            await context.Response.WriteAsJsonAsync(
+                body, ApiJsonContext.Default.ValidationErrorResponse);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled exception");
             context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-            context.Response.ContentType = "application/json";
 
-            await context.Response.WriteAsync(
-                JsonSerializer.Serialize(new { title = "Internal Server Error", status = 500 }));
+            await context.Response.WriteAsJsonAsync(
+                new ErrorResponse("Internal Server Error", 500),
+                ApiJsonContext.Default.ErrorResponse);
         }
     }
 }
