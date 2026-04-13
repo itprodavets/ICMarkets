@@ -35,6 +35,13 @@ public static class DependencyInjection
                 client.DefaultRequestHeaders.Add("Accept", "application/json");
                 client.Timeout = TimeSpan.FromSeconds(30);
             })
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+                MaxConnectionsPerServer = 10,
+                ConnectTimeout = TimeSpan.FromSeconds(5),
+                EnableMultipleHttp2Connections = true
+            })
             .AddTransientHttpErrorPolicy(p =>
                 p.WaitAndRetryAsync(3, attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt))))
             .AddTransientHttpErrorPolicy(p =>
