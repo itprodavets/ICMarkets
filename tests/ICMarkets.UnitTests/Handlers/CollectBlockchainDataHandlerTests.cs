@@ -44,9 +44,9 @@ public class CollectBlockchainDataHandlerTests
         var count = await _handler.Handle(new CollectBlockchainDataCommand(), CancellationToken.None);
 
         count.Should().Be(BlockchainEndpoint.Supported.Count);
-        _repoMock.Verify(r => r.AddRangeAsync(
-            It.Is<IEnumerable<BlockchainData>>(d => d.Count() == BlockchainEndpoint.Supported.Count),
-            It.IsAny<CancellationToken>()), Times.Once);
+        _repoMock.Verify(r => r.AddAsync(
+            It.IsAny<BlockchainData>(),
+            It.IsAny<CancellationToken>()), Times.Exactly(BlockchainEndpoint.Supported.Count));
         _uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
