@@ -32,7 +32,11 @@ public static class DependencyInjection
                 client.Timeout = TimeSpan.FromSeconds(30);
             })
             .AddTransientHttpErrorPolicy(p =>
-                p.WaitAndRetryAsync(3, attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt))));
+                p.WaitAndRetryAsync(3, attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt))))
+            .AddTransientHttpErrorPolicy(p =>
+                p.CircuitBreakerAsync(
+                    handledEventsAllowedBeforeBreaking: 5,
+                    durationOfBreak: TimeSpan.FromSeconds(30)));
 
         services.AddHostedService<BlockchainDataCollector>();
 

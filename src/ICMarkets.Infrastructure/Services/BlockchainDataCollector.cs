@@ -48,8 +48,15 @@ public class BlockchainDataCollector : BackgroundService
             var repository = scope.ServiceProvider.GetRequiredService<IBlockchainDataRepository>();
             var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
+            // BlockCypher free tier allows ~3 req/s, throttle accordingly
+            using var semaphore = new SemaphoreSlim(3);
             var fetchTasks = BlockchainEndpoint.Supported
-                .Select(ep => FetchSafeAsync(client, ep, ct));
+                .Select(async ep =>
+                {
+                    await semaphore.WaitAsync(ct);
+                    try { return await FetchSafeAsync(client, ep, ct); }
+                    finally { semaphore.Release(); }
+                });
 
             var results = await Task.WhenAll(fetchTasks);
             var succeeded = results.Where(r => r is not null).ToList();
