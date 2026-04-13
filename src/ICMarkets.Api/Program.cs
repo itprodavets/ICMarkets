@@ -1,9 +1,11 @@
 using System.IO.Compression;
+using System.Threading.RateLimiting;
 using ICMarkets.Api.Middleware;
 using ICMarkets.Api.Serialization;
 using ICMarkets.Application;
 using ICMarkets.Infrastructure;
 using ICMarkets.Infrastructure.Data;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -36,6 +38,28 @@ builder.Services.AddResponseCompression(options =>
 });
 builder.Services.Configure<BrotliCompressionProviderOptions>(o =>
     o.Level = CompressionLevel.Fastest);
+
+// Rate limiting — protect API from abuse
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddFixedWindowLimiter("api", limiter =>
+    {
+        limiter.PermitLimit = 100;
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiter.QueueLimit = 10;
+    });
+
+    options.AddFixedWindowLimiter("collect", limiter =>
+    {
+        limiter.PermitLimit = 5;
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiter.QueueLimit = 2;
+    });
+});
 
 // Controllers + source-generated JSON serializer (zero-reflection)
 builder.Services.AddControllers()
@@ -76,6 +100,15 @@ using (var scope = app.Services.CreateScope())
         await db.Database.EnsureCreatedAsync();
 }
 
+// Security headers
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    await next();
+});
+
 app.UseResponseCompression();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
@@ -86,6 +119,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("Default");
+app.UseRateLimiter();
 app.UseOutputCache();
 
 app.MapControllers();

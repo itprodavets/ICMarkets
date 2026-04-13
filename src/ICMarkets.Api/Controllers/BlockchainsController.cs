@@ -6,12 +6,14 @@ using ICMarkets.Application.DTOs;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace ICMarkets.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[EnableRateLimiting("api")]
 public sealed class BlockchainsController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -58,6 +60,7 @@ public sealed class BlockchainsController : ControllerBase
     }
 
     [HttpPost("collect")]
+    [EnableRateLimiting("collect")]
     [ProducesResponseType(typeof(CollectResult), StatusCodes.Status200OK)]
     public async Task<IActionResult> Collect(CancellationToken ct)
     {

@@ -22,7 +22,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080
-      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=cryptoexchange;Username=postgres;Password=postgres
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=cryptoexchange;Username=postgres;Password=postgres;Maximum Pool Size=100;Minimum Pool Size=5;Multiplexing=true
     ports:
       - "8080:8080"
     depends_on:
