@@ -15,6 +15,15 @@ builder.Host.UseSerilog((ctx, cfg) =>
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
+// Output caching for read-heavy endpoints
+builder.Services.AddOutputCache(options =>
+{
+    options.AddBasePolicy(b => b.NoCache());
+    options.AddPolicy("BlockchainData", b =>
+        b.Expire(TimeSpan.FromSeconds(30))
+         .Tag("blockchain"));
+});
+
 // Controllers + Swagger
 builder.Services.AddControllers()
     .AddJsonOptions(o =>
@@ -62,6 +71,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("Default");
+app.UseOutputCache();
 
 app.MapControllers();
 app.MapHealthChecks("/health");
