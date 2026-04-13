@@ -4,6 +4,7 @@ using ICMarkets.Application.Common;
 using ICMarkets.Application.DTOs;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 
 namespace ICMarkets.Api.Controllers;
 
@@ -13,13 +14,16 @@ namespace ICMarkets.Api.Controllers;
 public class BlockchainsController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly IOutputCacheStore _cacheStore;
 
-    public BlockchainsController(IMediator mediator)
+    public BlockchainsController(IMediator mediator, IOutputCacheStore cacheStore)
     {
         _mediator = mediator;
+        _cacheStore = cacheStore;
     }
 
     [HttpGet]
+    [OutputCache(PolicyName = "BlockchainData")]
     [ProducesResponseType(typeof(IReadOnlyList<BlockchainDataDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(CancellationToken ct)
     {
@@ -28,6 +32,7 @@ public class BlockchainsController : ControllerBase
     }
 
     [HttpGet("{network}/{chain}")]
+    [OutputCache(PolicyName = "BlockchainData", VaryByRouteValueNames = ["network", "chain"])]
     [ProducesResponseType(typeof(BlockchainDataDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetLatest(string network, string chain, CancellationToken ct)
@@ -56,6 +61,10 @@ public class BlockchainsController : ControllerBase
     public async Task<IActionResult> Collect(CancellationToken ct)
     {
         var count = await _mediator.Send(new CollectBlockchainDataCommand(), ct);
+
+        // invalidate cached responses so subsequent reads reflect fresh data
+        await _cacheStore.EvictByTagAsync("blockchain", ct);
+
         return Ok(new { CollectedCount = count });
     }
 }
