@@ -56,19 +56,26 @@ public sealed class BlockchainDataCollector : BackgroundService
                     await semaphore.WaitAsync(ct);
                     try { return await FetchSafeAsync(client, ep, ct); }
                     finally { semaphore.Release(); }
-                });
+                })
+                .ToList();
 
-            var results = await Task.WhenAll(fetchTasks);
-            var succeeded = results.Where(r => r is not null).ToList();
-
-            if (succeeded.Count > 0)
+            // Process results as they arrive — don't wait for the slowest endpoint
+            var count = 0;
+            await foreach (var completedTask in Task.WhenEach(fetchTasks))
             {
-                await repository.AddRangeAsync(succeeded!, ct);
-                await unitOfWork.SaveChangesAsync(ct);
+                var result = await completedTask;
+                if (result is not null)
+                {
+                    await repository.AddAsync(result, ct);
+                    count++;
+                }
             }
 
+            if (count > 0)
+                await unitOfWork.SaveChangesAsync(ct);
+
             _logger.LogInformation("Collected {Success}/{Total} blockchain snapshots",
-                succeeded.Count, BlockchainEndpoint.Supported.Count);
+                count, BlockchainEndpoint.Supported.Count);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -81,9 +88,18 @@ public sealed class BlockchainDataCollector : BackgroundService
         BlockchainEndpoint endpoint,
         CancellationToken ct)
     {
+        // Per-request timeout — one slow endpoint won't block the entire cycle
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(10));
+
         try
         {
-            return await client.FetchAsync(endpoint, ct);
+            return await client.FetchAsync(endpoint, cts.Token);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            _logger.LogWarning("Request timed out for {Endpoint}", endpoint);
+            return null;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

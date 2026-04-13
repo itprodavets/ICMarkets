@@ -31,31 +31,49 @@ public sealed class CollectBlockchainDataHandler
     public async Task<int> Handle(CollectBlockchainDataCommand request, CancellationToken ct)
     {
         var fetchTasks = BlockchainEndpoint.Supported
-            .Select(async endpoint =>
-            {
-                try
-                {
-                    return await _client.FetchAsync(endpoint, ct);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to fetch data for {Endpoint}", endpoint);
-                    return null;
-                }
-            });
+            .Select(endpoint => FetchSafeAsync(endpoint, ct))
+            .ToList();
 
-        var results = await Task.WhenAll(fetchTasks);
-        var succeeded = results.Where(r => r is not null).ToList();
-
-        if (succeeded.Count > 0)
+        // Process results as they arrive — fast endpoints don't wait for slow ones
+        var count = 0;
+        await foreach (var completedTask in Task.WhenEach(fetchTasks))
         {
-            await _repository.AddRangeAsync(succeeded!, ct);
-            await _unitOfWork.SaveChangesAsync(ct);
+            var result = await completedTask;
+            if (result is not null)
+            {
+                await _repository.AddAsync(result, ct);
+                count++;
+            }
         }
 
-        _logger.LogInformation("Collected {Count}/{Total} blockchain snapshots",
-            succeeded.Count, BlockchainEndpoint.Supported.Count);
+        if (count > 0)
+            await _unitOfWork.SaveChangesAsync(ct);
 
-        return succeeded.Count;
+        _logger.LogInformation("Collected {Count}/{Total} blockchain snapshots",
+            count, BlockchainEndpoint.Supported.Count);
+
+        return count;
+    }
+
+    private async Task<Domain.Entities.BlockchainData?> FetchSafeAsync(
+        BlockchainEndpoint endpoint, CancellationToken ct)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(10));
+
+        try
+        {
+            return await _client.FetchAsync(endpoint, cts.Token);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            _logger.LogWarning("Request timed out for {Endpoint}", endpoint);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to fetch data for {Endpoint}", endpoint);
+            return null;
+        }
     }
 }
